@@ -1,0 +1,23 @@
+{
+  "name": "graphics.js-platformer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "game.js",
+  "scripts": {
+    "start": "parcel index.html"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "browserslist": [
+    "last 3 and_chr versions",
+    "last 3 chrome versions",
+    "last 3 opera versions",
+    "last 3 ios_saf versions",
+    "last 3 safari versions"
+  ],
+  "dependencies": {
+    "@soft-boy/graphics.js": "^1.0.4",
+    "parcel-bundler": "^1.12.5"
+  }
+}
