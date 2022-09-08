@@ -1,58 +1,25 @@
-var playerXSpeed = 7;
-var gravity = 30;
-var jumpSpeed = 17;
-var wobbleSpeed = 8, wobbleDist = 0.07;
+var PLAYER_X_SPEED = 7;
+var GRAVITY = 30;
+var JUMP_SPEED = 17;
+var WOBBLE_SPEED = 8
+var WOBBLE_DIST = 0.07;
 
-function overlap(actor1, actor2) {
+export function overlap(actor1, actor2) {
   return actor1.pos.x + actor1.size.x > actor2.pos.x &&
     actor1.pos.x < actor2.pos.x + actor2.size.x &&
     actor1.pos.y + actor1.size.y > actor2.pos.y &&
     actor1.pos.y < actor2.pos.y + actor2.size.y;
 }
 
-export class State {
-  constructor(level, actors, status) {
-    this.level = level;
-    this.actors = actors;
-    this.status = status;
-  }
-
-  static start(level) {
-    return new State(level, level.startActors, "playing");
-  }
-
-  get player() {
-    return this.actors.find(a => a.type == "player");
-  }
-
-  update(time, keys) {
-    let actors = this.actors
-      .map(actor => actor.update(time, this, keys));
-    let newState = new State(this.level, actors, this.status);
-  
-    if (newState.status != "playing") return newState;
-  
-    let player = newState.player;
-    if (this.level.touches(player.pos, player.size, "lava")) {
-      return new State(this.level, actors, "lost");
-    }
-  
-    for (let actor of actors) {
-      if (actor != player && overlap(actor, player)) {
-        newState = actor.collide(newState);
-      }
-    }
-    return newState;
-  };
-}
-
 export class Vec {
   constructor(x, y) {
     this.x = x; this.y = y;
   }
+
   plus(other) {
     return new Vec(this.x + other.x, this.y + other.y);
   }
+
   times(factor) {
     return new Vec(this.x * factor, this.y * factor);
   }
@@ -68,27 +35,32 @@ export class Player {
   get type() { return "player"; }
 
   static create(pos) {
-    return new Player(pos.plus(new Vec(0, -0.5)),
-                      new Vec(0, 0));
+    return new Player(pos.plus(new Vec(0, -0.5)), new Vec(0, 0));
   }
 
-  update(time, state, keys) {
+  update(world, time, isKeyPressed) {
     let xSpeed = 0;
-    if (keys.left) xSpeed -= playerXSpeed;
-    if (keys.right) xSpeed += playerXSpeed;
+
+    if (isKeyPressed('left')) xSpeed -= PLAYER_X_SPEED;
+    if (isKeyPressed('right')) xSpeed += PLAYER_X_SPEED;
+
     let pos = this.pos;
     let movedX = pos.plus(new Vec(xSpeed * time, 0));
-    if (!state.level.touches(movedX, this.size, "wall")) {
+
+    if (!world.level.touches(movedX, this.size, "wall")) {
       pos = movedX;
     }
   
-    let ySpeed = this.speed.y + time * gravity;
+    let ySpeed = this.speed.y + time * GRAVITY;
     let movedY = pos.plus(new Vec(0, ySpeed * time));
-    if (!state.level.touches(movedY, this.size, "wall")) {
+
+    if (!world.level.touches(movedY, this.size, "wall")) {
       pos = movedY;
-    } else if (keys.up && ySpeed > 0) {
-      ySpeed = -jumpSpeed;
-    } else {
+    }
+    else if (isKeyPressed('up') && ySpeed > 0) {
+      ySpeed = -JUMP_SPEED;
+    }
+    else {
       ySpeed = 0;
     }
 
@@ -109,24 +81,28 @@ export class Lava {
   static create(pos, ch) {
     if (ch == "=") {
       return new Lava(pos, new Vec(2, 0));
-    } else if (ch == "|") {
+    }
+    else if (ch == "|") {
       return new Lava(pos, new Vec(0, 2));
-    } else if (ch == "v") {
+    }
+    else if (ch == "v") {
       return new Lava(pos, new Vec(0, 3), pos);
     }
   }
 
-  collide(state) {
-    return new State(state.level, state.actors, "lost");
+  collide(world) {
+    world.status = 'lost'
   };
 
-  update(time, state) {
+  update(world, time) {
     let newPos = this.pos.plus(this.speed.times(time));
-    if (!state.level.touches(newPos, this.size, "wall")) {
+    if (!world.level.touches(newPos, this.size, "wall")) {
       return new Lava(newPos, this.speed, this.reset);
-    } else if (this.reset) {
+    }
+    else if (this.reset) {
       return new Lava(this.reset, this.speed, this.reset);
-    } else {
+    } 
+    else {
       return new Lava(this.pos, this.speed.times(-1));
     }
   };
@@ -144,29 +120,31 @@ export class Coin {
 
   static create(pos) {
     let basePos = pos.plus(new Vec(0.2, 0.1));
-    return new Coin(basePos, basePos,
-                    Math.random() * Math.PI * 2);
+    return new Coin(basePos, basePos, Math.random() * Math.PI * 2);
   }
 
-  collide(state) {
-    let filtered = state.actors.filter(a => a != this);
-    let status = state.status;
-    if (!filtered.some(a => a.type == "coin")) status = "won";
-    return new State(state.level, filtered, status);
+  collide(world) {
+    world.actors = world.actors.filter(a => a != this);
+    if (!world.actors.some(a => a.type == "coin")) world.status = "won";
   };
 
-  update(time) {
-    let wobble = this.wobble + time * wobbleSpeed;
-    let wobblePos = Math.sin(wobble) * wobbleDist;
+  update(world, time) {
+    let wobble = this.wobble + time * WOBBLE_SPEED;
+    let wobblePos = Math.sin(wobble) * WOBBLE_DIST;
     return new Coin(this.basePos.plus(new Vec(0, wobblePos)),
       this.basePos, wobble);
   };
 }
 
 const levelChars = {
-  ".": "empty", "#": "wall", "+": "lava",
-  "@": Player, "o": Coin,
-  "=": Lava, "|": Lava, "v": Lava
+  ".": "empty",
+  "#": "wall",
+  "+": "lava",
+  "@": Player,
+  "o": Coin,
+  "=": Lava,
+  "|": Lava,
+  "v": Lava
 };
 
 export class Level {
@@ -180,8 +158,8 @@ export class Level {
       return row.map((ch, x) => {
         let type = levelChars[ch];
         if (typeof type == "string") return type;
-        this.startActors.push(
-          type.create(new Vec(x, y), ch));
+        this.startActors.push(type.create(new Vec(x, y), ch));
+
         return "empty";
       });
     });
@@ -195,8 +173,10 @@ export class Level {
 
     for (let y = yStart; y < yEnd; y++) {
       for (let x = xStart; x < xEnd; x++) {
-        let isOutside = x < 0 || x >= this.width ||
-                        y < 0 || y >= this.height;
+        let isOutside = x < 0 ||
+          x >= this.width ||
+          y < 0 ||
+          y >= this.height;
         let here = isOutside ? "wall" : this.rows[y][x];
         if (here == type) return true;
       }
